@@ -1,0 +1,8 @@
+{
+  "name": "com.shards",
+  "version": "0.1.0",
+  "description": "A hierarchical save/load solution for Unity",
+  "displayName": "Shards",
+  "unity": "2022.3",
+  "license": "MIT"
+}
