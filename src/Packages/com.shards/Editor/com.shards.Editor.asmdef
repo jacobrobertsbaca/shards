@@ -1,7 +1,9 @@
 {
     "name": "com.shards.Editor",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:28e97202730ec2c44ab0b82e6adf5f31"
+    ],
     "includePlatforms": [
         "Editor"
     ],
