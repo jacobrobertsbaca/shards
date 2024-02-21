@@ -13,17 +13,14 @@ namespace Shards
     [DisallowMultipleComponent]
     public class Shard : MonoBehaviour
     {
+        private static readonly int kGlobalIdPrefixLen = "GlobalObjectId_V1-2-".Length;
+
         [SerializeField] private string guid;
         public string Identifier => guid;
 
         private void Awake()
         {
             TryAssignIdentifier();
-        }
-
-        private void Update()
-        {
-            if (!Application.IsPlaying(gameObject)) TryAssignIdentifier();
         }
 
 #if UNITY_EDITOR
@@ -36,13 +33,13 @@ namespace Shards
             {
                 // Play mode
                 if (string.IsNullOrWhiteSpace(guid))
-                    guid = System.Guid.NewGuid().ToString();
+                    guid = $"Dynamic {{{System.Guid.NewGuid()}}}";
             }
             else
             {
                 // Editor
 #if UNITY_EDITOR
-                var globalId = GlobalObjectId.GetGlobalObjectIdSlow(gameObject).ToString();
+                string globalId = GetStaticIdentifier();
 
                 if (globalId != guid)
                 {
@@ -60,5 +57,23 @@ namespace Shards
 #endif
             }
         }
+
+#if UNITY_EDITOR
+        private string GetStaticIdentifier()
+        {
+            // Prefab assets always have null identifiers so that they get assigned
+            // a dynamic identifier when initialized
+            if (PrefabUtility.IsPartOfPrefabAsset(this)) return null;
+            if (PrefabStageUtility.GetPrefabStage(gameObject)) return null;
+
+            // Get a persistent identifier for the object
+            // If the identifierType is not equal to 2 (scene object), then
+            // this is not a scene object (could be part of a prefab, ScriptableObject, etc.)
+            GlobalObjectId globalId = GlobalObjectId.GetGlobalObjectIdSlow(gameObject);
+            if (globalId.identifierType != 2) return null;
+
+            return $"Static {{{globalId.ToString().Substring(kGlobalIdPrefixLen)}}}";
+        }
+#endif
     }
 }
