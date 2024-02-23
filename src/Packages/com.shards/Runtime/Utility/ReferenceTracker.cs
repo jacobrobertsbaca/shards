@@ -28,13 +28,20 @@ namespace Shards.Utility
                 this.id = id;
                 this.shard = shard;
             }
+
+            public bool IsValid()
+            {
+                if (shard == null) return false;
+                if (string.IsNullOrWhiteSpace(id)) return false;
+                return true;
+            }
         }
 
         public Reference[] References
         {
             get
             {
-                var refArray = refs.Values.Where(r => r.Shard != null).ToArray();
+                var refArray = refs.Values.Where(r => r.IsValid()).ToArray();
                 Array.Sort(refArray, (a, b) => -a.Present.CompareTo(b.Present));
                 return refArray;
             }
@@ -44,7 +51,7 @@ namespace Shards.Utility
                 refs.Clear();
                 foreach (var sr in value)
                 {
-                    if (sr.Shard != null) refs.Add(sr.Id, sr);
+                    if (sr.IsValid()) refs.Add(sr.Id, sr);
                 }
             }
         }
