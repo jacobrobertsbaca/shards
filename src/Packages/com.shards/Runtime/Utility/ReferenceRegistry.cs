@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Shards.Utility
 {
-    public class ReferenceTracker
+    public class ReferenceRegistry
     {
         [Serializable]
         public class Reference
