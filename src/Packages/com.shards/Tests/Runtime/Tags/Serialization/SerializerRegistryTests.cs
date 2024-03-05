@@ -11,7 +11,7 @@ namespace Shards.Tests.Tags.Serialization
     public class SerializerRegistryTests
     {
         [Test]
-        public void TypeExpansions()
+        public void ExpandType()
         {
             Assert.That(SerializerRegistry.GetTypeExpansions(typeof(float)), Is.EquivalentTo(new[] {
                 (0, typeof(float)), (1, SerializerRegistry.OpenType)
@@ -19,16 +19,60 @@ namespace Shards.Tests.Tags.Serialization
 
             Assert.That(SerializerRegistry.GetTypeExpansions(typeof(List<int>)), Is.EquivalentTo(new[] {
                 (0, typeof(List<int>)),
-                (1, typeof(List<>).MakeGenericType(new[] { SerializerRegistry.OpenType })),
+                (1, typeof(List<SerializerRegistry.Open>)),
                 (2, SerializerRegistry.OpenType)
             }));
 
             Assert.That(SerializerRegistry.GetTypeExpansions(typeof(Dictionary<string, bool>)), Is.EquivalentTo(new[] {
                 (0, typeof(Dictionary<string, bool>)),
-                (1, typeof(Dictionary<,>).MakeGenericType(new[] { typeof(string), SerializerRegistry.OpenType })),
-                (1, typeof(Dictionary<,>).MakeGenericType(new[] { SerializerRegistry.OpenType, typeof(bool) })),
-                (2, typeof(Dictionary<,>).MakeGenericType(new[] { SerializerRegistry.OpenType, SerializerRegistry.OpenType })),
+                (1, typeof(Dictionary<SerializerRegistry.Open, bool>)),
+                (1, typeof(Dictionary<string, SerializerRegistry.Open>)),
+                (2, typeof(Dictionary<SerializerRegistry.Open,SerializerRegistry.Open>)),
                 (3, SerializerRegistry.OpenType)
+            }));
+        }
+
+        [Test]
+        public void ExpandArrayType()
+        {
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(float[])), Is.EquivalentTo(new[] {
+                (0, typeof(float[])),
+                (1, typeof(SerializerRegistry.Open[])),
+                (2, SerializerRegistry.OpenType)
+            }));
+
+            // Test multidimensional arrays
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(float[,])), Is.EquivalentTo(new[] {
+                (0, typeof(float[,])),
+                (1, typeof(SerializerRegistry.Open[,])),
+                (2, SerializerRegistry.OpenType)
+            }));
+
+            // Test nested arrays
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(float[][])), Is.EquivalentTo(new[] {
+                (0, typeof(float[][])),
+                (1, typeof(SerializerRegistry.Open[][])),
+                (2, typeof(SerializerRegistry.Open[])),
+                (3, SerializerRegistry.OpenType)
+            }));
+        }
+
+        [Test]
+        public void ExpandMixedType()
+        {
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(Dictionary<float[], List<int>>[])), Is.EquivalentTo(new[]
+            {
+                (0, typeof(Dictionary<float[], List<int>>[])),
+                (1, typeof(Dictionary<float[], List<SerializerRegistry.Open>>[])),
+                (1, typeof(Dictionary<SerializerRegistry.Open[], List<int>>[])),
+                (2, typeof(Dictionary<float[], SerializerRegistry.Open>[])),
+                (2, typeof(Dictionary<SerializerRegistry.Open[], List<SerializerRegistry.Open>>[])),
+                (2, typeof(Dictionary<SerializerRegistry.Open, List<int>>[])),
+                (3, typeof(Dictionary<SerializerRegistry.Open, List<SerializerRegistry.Open>>[])),
+                (3, typeof(Dictionary<SerializerRegistry.Open[], SerializerRegistry.Open>[])),
+                (4, typeof(Dictionary<SerializerRegistry.Open, SerializerRegistry.Open>[])),
+                (5, typeof(SerializerRegistry.Open[])),
+                (6, typeof(SerializerRegistry.Open)),
             }));
         }
 

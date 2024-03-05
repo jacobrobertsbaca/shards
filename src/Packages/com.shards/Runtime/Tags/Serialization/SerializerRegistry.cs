@@ -9,7 +9,7 @@ namespace Shards.Tags.Serialization
 {
     internal class SerializerRegistry
     {
-        private struct Open {}
+        internal struct Open {}
         internal static readonly Type OpenType = typeof(Open);
 
         private class SerializerRecord
@@ -229,7 +229,7 @@ namespace Shards.Tags.Serialization
 
                 if (templateType.IsGenericTypeParameter)
                 {
-                    // Add constraints
+                    // Search generic constraints
                     foreach (var constraint in templateType.GetGenericParameterConstraints())
                     {
                         Type baseType = GetBaseType(objectType, constraint);
@@ -263,6 +263,24 @@ namespace Shards.Tags.Serialization
 
         internal static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type)
         {
+            if (type.IsArray)
+            {
+                // Array<T>
+                // -> (..., Array<Expand(T)>)
+                // -> (Max(Expand(T)) + 1, OpenType)
+
+                int max = 0;
+                foreach (var (complexity, expansion) in GetTypeExpansions(type.GetElementType()))
+                {
+                    max = Mathf.Max(max, complexity);
+                    if (type.IsSZArray) yield return (complexity, expansion.MakeArrayType());
+                    else yield return (complexity, expansion.MakeArrayType(type.GetArrayRank()));
+                }
+
+                yield return (max + 1, OpenType);
+                yield break;
+            }
+
             if (!type.IsGenericType)
             {
                 yield return (0, type);
