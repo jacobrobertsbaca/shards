@@ -10,7 +10,7 @@ namespace Shards.Tags.Serialization
     internal class SerializerRegistry
     {
         private struct Open {}
-        private static readonly Type OpenType = typeof(Open);
+        internal static readonly Type OpenType = typeof(Open);
 
         private class SerializerRecord
         {
@@ -171,29 +171,16 @@ namespace Shards.Tags.Serialization
         /// </summary>
         /// <param name="serializerType">The type of the serializer.</param>
         /// <returns>The serializer's desired type.</returns>
-        private static Type GetSerializedType(Type serializerType)
-        {
-            return GetBaseType(serializerType, typeof(TagSerializer<>)).GetGenericArguments()[0];
-        }
+        private static Type GetSerializedType(Type serializerType) => GetBaseType(serializerType, typeof(TagSerializer<>)).GetGenericArguments()[0];
 
         private static Type GetNormalizedType(Type type)
         {
             if (type.IsGenericParameter) return OpenType; 
             if (!type.IsGenericType) return type;
 
-            Type genericDefinition = type.GetGenericTypeDefinition();
-            Type[] genericArguments = type.GetGenericArguments();
-            Type[] definedArguments = genericDefinition.GetGenericArguments();
-            Type[] normalizedArguments = new Type[genericArguments.Length];
-
-            for (int i = 0; i < normalizedArguments.Length; i++)
-            {
-                if (genericArguments[i].IsGenericTypeParameter)
-                    normalizedArguments[i] = definedArguments[i];
-                else normalizedArguments[i] = GetNormalizedType(genericArguments[i]);
-            }
-
-            return genericDefinition.MakeGenericType(normalizedArguments);
+            return type.GetGenericTypeDefinition().MakeGenericType(
+                type.GetGenericArguments().Select(t => GetNormalizedType(t)).ToArray()
+            );
         }
 
         private static bool TryBindSerializerType(Type objectType, Type templateType, Type serializerType, out Type constructedType)
@@ -274,7 +261,7 @@ namespace Shards.Tags.Serialization
             return ConstructGenericTypeMap(objectType, templateType, typeMap);
         }
 
-        private static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type)
+        internal static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type)
         {
             if (!type.IsGenericType)
             {
@@ -283,7 +270,7 @@ namespace Shards.Tags.Serialization
                 yield break;
             }
 
-            var expansions = GetTypeExpansions(type, type.GetGenericArguments(), type.GetGenericTypeDefinition().GetGenericArguments(), 0, 0);
+            var expansions = GetTypeExpansions(type, type.GetGenericArguments(), 0, 0);
             int maxComplexity = 0;
 
             foreach (var expansion in expansions)
@@ -295,7 +282,7 @@ namespace Shards.Tags.Serialization
             yield return (maxComplexity + 1, OpenType);
         }
 
-        private static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type, Type[] arguments, Type[] openArguments, int index, int complexity)
+        private static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type, Type[] arguments, int index, int complexity)
         {
             if (index >= arguments.Length)
             {
@@ -310,14 +297,9 @@ namespace Shards.Tags.Serialization
             {
                 maxComplexity = Mathf.Max(maxComplexity, prevComplexity);
                 arguments[index] = substitution;
-                foreach (var expansion in GetTypeExpansions(type, arguments, openArguments, index + 1, complexity + prevComplexity))
+                foreach (var expansion in GetTypeExpansions(type, arguments, index + 1, complexity + prevComplexity))
                     yield return expansion;
             }
-
-            // Substitute open argument
-            arguments[index] = openArguments[index];
-            foreach (var expansion in GetTypeExpansions(type, arguments, openArguments, index + 1, complexity + maxComplexity + 1))
-                yield return expansion;
 
             arguments[index] = given;
         }

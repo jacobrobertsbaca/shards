@@ -15,7 +15,7 @@ namespace Shards.Tests.Tags.Serialization
             ITag serialized = TagSerializer.Serialize<TSource>(source);
             Assert.That(serialized is ListTag);
             TSource deserialized = TagSerializer.Deserialize<TSource>(serialized);
-            Assert.That(deserialized, Is.EquivalentTo(source));
+            Assert.That(deserialized, Is.EqualTo(source));
         }
 
         [Test] public void SerializeArray() => TestEnumerable(new int[] { 1, 2, 3 });

@@ -10,6 +10,28 @@ namespace Shards.Tests.Tags.Serialization
 {
     public class SerializerRegistryTests
     {
+        [Test]
+        public void TypeExpansions()
+        {
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(float)), Is.EquivalentTo(new[] {
+                (0, typeof(float)), (1, SerializerRegistry.OpenType)
+            }));
+
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(List<int>)), Is.EquivalentTo(new[] {
+                (0, typeof(List<int>)),
+                (1, typeof(List<>).MakeGenericType(new[] { SerializerRegistry.OpenType })),
+                (2, SerializerRegistry.OpenType)
+            }));
+
+            Assert.That(SerializerRegistry.GetTypeExpansions(typeof(Dictionary<string, bool>)), Is.EquivalentTo(new[] {
+                (0, typeof(Dictionary<string, bool>)),
+                (1, typeof(Dictionary<,>).MakeGenericType(new[] { typeof(string), SerializerRegistry.OpenType })),
+                (1, typeof(Dictionary<,>).MakeGenericType(new[] { SerializerRegistry.OpenType, typeof(bool) })),
+                (2, typeof(Dictionary<,>).MakeGenericType(new[] { SerializerRegistry.OpenType, SerializerRegistry.OpenType })),
+                (3, SerializerRegistry.OpenType)
+            }));
+        }
+
         [TagSerializer(Ignore = true)]
         private class StringKeyDictSerializer<T> : TagSerializer<Dictionary<string, T>>
         {
