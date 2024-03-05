@@ -5,8 +5,15 @@ using UnityEngine;
 
 namespace Shards.Tags
 {
+    [Tag(TagType.Null)]
+    public struct NullTag : ITag
+    {
+        public void Read(BinaryReader reader) {}
+        public void Write(BinaryWriter writer) {}
+    }
+
     [Tag(TagType.String)]
-    public struct StringTag : ITag
+    public struct StringTag : IValueTag<string>
     {
         public string Value { get; set; }
         public StringTag(string value) => Value = value;
@@ -15,7 +22,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Byte)]
-    public struct ByteTag : ITag
+    public struct ByteTag : IValueTag<byte>
     {
         public byte Value { get; set; }
         public ByteTag(byte value) => Value = value;
@@ -24,7 +31,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Int16)]
-    public struct Int16Tag : ITag
+    public struct Int16Tag : IValueTag<short>
     {
         public short Value { get; set; }
         public Int16Tag(short value) => Value = value;
@@ -33,7 +40,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Int32)]
-    public struct Int32Tag : ITag
+    public struct Int32Tag : IValueTag<int>
     {
         public int Value { get; set; }
         public Int32Tag(int value) => Value = value;
@@ -42,7 +49,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Int64)]
-    public struct Int64Tag : ITag
+    public struct Int64Tag : IValueTag<long>
     {
         public long Value { get; set; }
         public Int64Tag(long value) => Value = value;
@@ -51,7 +58,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Float)]
-    public struct FloatTag : ITag
+    public struct FloatTag : IValueTag<float>
     {
         public float Value { get; set; }
         public FloatTag(float value) => Value = value;
@@ -60,7 +67,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Double)]
-    public struct DoubleTag : ITag
+    public struct DoubleTag : IValueTag<double>
     {
         public double Value { get; set; }
         public DoubleTag(double value) => Value = value;
@@ -69,7 +76,7 @@ namespace Shards.Tags
     }
 
     [Tag(TagType.Bool)]
-    public struct BoolTag : ITag
+    public struct BoolTag : IValueTag<bool>
     {
         public bool Value { get; set; }
         public BoolTag(bool value) => Value = value;

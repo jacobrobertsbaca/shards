@@ -27,4 +27,9 @@ namespace Shards.Tags
         /// </remarks>
         void Write(BinaryWriter writer);
     }
+
+    public interface IValueTag<TValue> : ITag
+    {
+        TValue Value { get; set; }
+    }
 }

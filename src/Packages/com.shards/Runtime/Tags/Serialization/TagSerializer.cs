@@ -19,59 +19,35 @@ namespace Shards.Tags.Serialization
         ITag ITagSerializer.Serialize(object value) => Serialize((T) value);
     }
 
-    public abstract class ListSerializer<T> : TagSerializer<List<T>> {}
-
-    public abstract class SetListSerializer<T> : ListSerializer<HashSet<T>> {}
-
-    public class DictionarySerializer<V, K> : TagSerializer<Dictionary<K, V>>
-    {
-        public override Dictionary<K, V> Deserialize(ITag tag)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override ITag Serialize(Dictionary<K, V> value)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    public class RandomSerializer<T, U, V> : TagSerializer<Dictionary<T, Dictionary<U, HashSet<V>>>>
-    {
-        public override Dictionary<T, Dictionary<U, HashSet<V>>> Deserialize(ITag tag)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override ITag Serialize(Dictionary<T, Dictionary<U, HashSet<V>>> value)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
     public static class TagSerializer
     {
-        public static void WalkHierarchy(Type type)
-        {
-            if (type is null) return;
-            Debug.Log($"\n{type}\n" +
-                $"\tIs this a generic type definition? {type.IsGenericTypeDefinition}\n" +
-                $"\tIs this a generic type? {type.IsGenericType}\n" +
-                $"\tGeneric type definition: {(type.IsGenericType ? type.GetGenericTypeDefinition() : null)}\n" +
-                $"\tType arguments: {string.Join<Type>(", ", type.GetGenericArguments())}");
-            WalkHierarchy(type.BaseType);
-
-           
-        }
+        private static readonly SerializerRegistry registry = new();
 
         public static T Deserialize<T>(ITag tag)
         {
-            return default;
+            if (tag is NullTag) return default;
+            ITagSerializer serializer = registry.Get<T>();
+            if (serializer is null) ThrowNoSerializer<T>();
+            return (T) serializer.Deserialize(tag);
         }
 
         public static ITag Serialize<T>(T value)
         {
-            return null;
+            if (value == null) return new NullTag();
+            ITagSerializer serializer = registry.Get<T>();
+            if (serializer is null) ThrowNoSerializer<T>();
+            return serializer.Serialize(value);
+        }
+
+        public static TTag ExpectTag<TTag>(ITag tag) where TTag : ITag
+        {
+            if (tag is TTag t) return t;
+            throw new TagException($"Expected {TagRegistry.GetTypeOfTag<TTag>()}, got {tag.Type}");
+        }
+
+        private static void ThrowNoSerializer<T>()
+        {
+            throw new SerializerNotFoundException($"A serializer could not be found for type {typeof(T)}");
         }
     }
 }

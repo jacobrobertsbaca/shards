@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Pool;
 
@@ -8,18 +9,14 @@ namespace Shards.Tags.Serialization
 {
     internal class SerializerRegistry
     {
-        private static IComparer<SerializerRecord> serializerComparer = Comparer<SerializerRecord>.Create((a, b) =>
-        {
-            // TODO: All serializers equal right now
-            // Need to allow user specified preferences
-            return 0;
-        });
+        private struct Open {}
+        private static readonly Type OpenType = typeof(Open);
 
         private class SerializerRecord
         {
             /// <summary>
             /// The type that this serializer serializes.
-            /// May contain open generic type parameters, but they will be those defiend by <see cref="SerializerType"/>
+            /// May contain open generic type parameters, but they will be those defined by <see cref="SerializerType"/>
             /// </summary>
             public Type SerializedType { get; }
 
@@ -38,10 +35,8 @@ namespace Shards.Tags.Serialization
 
         /**
          * Maps a normalized serialized type (could be generic) to a set of possible serializer types for that type.
-         * This set is sorted by priority of the serializer, with higher priority
-         * serializers appearing first.
          */
-        private readonly Dictionary<Type, SortedSet<SerializerRecord>> declaredSerializers = new();
+        private readonly Dictionary<Type, List<SerializerRecord>> declaredSerializers = new();
 
         /**
          * Maps a desired type (not generic) to a serializer for that type.
@@ -49,14 +44,17 @@ namespace Shards.Tags.Serialization
          */
         private readonly Dictionary<Type, ITagSerializer> serializers = new();
 
-        public SerializerRegistry()
+        public SerializerRegistry(params Type[] source) : this(source as IEnumerable<Type>) {}
+
+        public SerializerRegistry(IEnumerable<Type> source = null)
         {
             // Go through all types deriving from ITagSerializer
             // and add them to the list of declared serializers
 
-            var serializerTypes = AppDomain.CurrentDomain.GetAssemblies()
+            var sourceTypes = source ?? AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(s => s.GetTypes())
-                .Where(s => !s.IsAbstract && typeof(ITagSerializer).IsAssignableFrom(s));
+                .Where(s => s.GetCustomAttribute<TagSerializerAttribute>() is var attr && attr?.Ignore != true);
+            var serializerTypes = sourceTypes.Where(s => !s.IsAbstract && typeof(ITagSerializer).IsAssignableFrom(s));
 
             foreach (var serializerType in serializerTypes)
             {
@@ -65,7 +63,7 @@ namespace Shards.Tags.Serialization
                 var record = new SerializerRecord(serializedType, serializerType);
 
                 if (!declaredSerializers.ContainsKey(normalizedType))
-                    declaredSerializers[normalizedType] = new SortedSet<SerializerRecord>(serializerComparer);
+                    declaredSerializers[normalizedType] = new();
                 declaredSerializers[normalizedType].Add(record);
             }
         }
@@ -80,6 +78,44 @@ namespace Shards.Tags.Serialization
 
         private ITagSerializer ResolveSerializer(Type objectType)
         {
+            IEnumerable<Type> ResolveSerializerTypesForType(Type normalizedType)
+            {
+                if (!declaredSerializers.TryGetValue(normalizedType, out var records)) yield break;
+
+                foreach (var record in records)
+                {
+                    if (TryBindSerializerType(objectType, record.SerializedType, record.SerializerType, out var serializerType))
+                        yield return serializerType;
+                }
+            }
+
+            bool TryResolveSerializerForGroup(IEnumerable<Type> group, out Type serializerType)
+            {
+                // Need to find the best serializer within this complexity group.
+                // Let's find ALL the valid serializers, and then choose the one with the lowest priority.
+
+                serializerType = null;
+
+                var bestSerializers = group.SelectMany(ResolveSerializerTypesForType)
+                    .GroupBy(GetSerializerPriority)
+                    .OrderBy(g => g.Key)
+                    .FirstOrDefault();
+
+                if (bestSerializers is null) return false;
+
+                if (bestSerializers.Count() > 1)
+                {
+                    throw new SerializerNotFoundException($"Error while attempting to locate a serializer for type \n\n\t{objectType}\n\n" +
+                        $"It is ambiguous which of the following serializers should serialize this type:" +
+                        $"\n\n\t{string.Join("\n\t", bestSerializers)}\n\n" +
+                        $"You can resolve this ambiguity by defining only one serializer for this type, " +
+                        $"or by marking one of them as having a higher priority using the [{typeof(TagSerializerAttribute).Name}] attribute.");
+                }
+
+                serializerType = bestSerializers.First();
+                return true;
+            }
+
             // Need to examine all possible type expansions of T
             // Within each complexity group, we will scan for available serializers
             // If a complexity group has more than one serializer, then it's ambiguous which
@@ -91,18 +127,7 @@ namespace Shards.Tags.Serialization
 
             foreach (var group in groups)
             {
-                Type serializerType = null;
-
-                foreach (var normalizedType in group)
-                {
-                    if (TryResolveSerializerType(normalizedType, objectType, out var candidate))
-                    {
-                        if (serializerType is not null) throw new ShardException("Multiple serializers found for the same type.");
-                        serializerType = candidate;
-                    }
-                }
-
-                if (serializerType is not null)
+                if (TryResolveSerializerForGroup(group, out Type serializerType))
                 {
                     // Found an unambiguous serializer for this type
                     return Activator.CreateInstance(serializerType) as ITagSerializer;
@@ -113,19 +138,31 @@ namespace Shards.Tags.Serialization
             return null;
         }
 
-        private bool TryResolveSerializerType(Type normalizedType, Type objectType, out Type serializerType)
+        private static int GetSerializerPriority(Type serializerType)
         {
-            serializerType = null;
+            var attr = serializerType.GetCustomAttribute<TagSerializerAttribute>();
+            if (attr is null) return 0;
+            return attr.Priority;
+        }
 
-            if (!declaredSerializers.TryGetValue(normalizedType, out var records)) return false;
+        private static Type GetBaseType(Type derivedType, Type baseType)
+        {
+            Debug.Assert(derivedType is not null);
+            if (derivedType == baseType) return derivedType;
+            if (!baseType.IsGenericType) return baseType.IsAssignableFrom(derivedType) ? baseType : null;
+            if (baseType.IsInterface) return derivedType.GetInterfaces()
+                    .Where(i => i.IsGenericType)
+                    .Where(i => i.GetGenericTypeDefinition() == baseType.GetGenericTypeDefinition())
+                    .SingleOrDefault();
 
-            foreach (var record in records)
+            Type WalkHierarchy(Type derived)
             {
-                if (TryBindSerializerType(objectType, record.SerializedType, record.SerializerType, out serializerType))
-                    return true;
+                if (derived.IsGenericType && derived.GetGenericTypeDefinition() == baseType.GetGenericTypeDefinition()) return derived;
+                if (derived.BaseType is not null) return WalkHierarchy(derived.BaseType);
+                return null;
             }
 
-            return false;
+            return WalkHierarchy(derivedType);
         }
 
         /// <summary>
@@ -134,22 +171,14 @@ namespace Shards.Tags.Serialization
         /// </summary>
         /// <param name="serializerType">The type of the serializer.</param>
         /// <returns>The serializer's desired type.</returns>
-        public static Type GetSerializedType(Type serializerType)
+        private static Type GetSerializedType(Type serializerType)
         {
-            Debug.Assert(serializerType is not null);
-
-            // If this type matches TagSerializer<T>,
-            // then the value of T is the serialized type
-            if (serializerType.IsGenericType && serializerType.GetGenericTypeDefinition() == typeof(TagSerializer<>))
-                return serializerType.GetGenericArguments()[0];
-
-            // Otherwise, walk up type hierarchy until we find the TagSerializer<T>
-            if (serializerType.BaseType is not null) return GetSerializedType(serializerType.BaseType);
-            return null;
+            return GetBaseType(serializerType, typeof(TagSerializer<>)).GetGenericArguments()[0];
         }
 
-        public static Type GetNormalizedType(Type type)
+        private static Type GetNormalizedType(Type type)
         {
+            if (type.IsGenericParameter) return OpenType; 
             if (!type.IsGenericType) return type;
 
             Type genericDefinition = type.GetGenericTypeDefinition();
@@ -167,19 +196,25 @@ namespace Shards.Tags.Serialization
             return genericDefinition.MakeGenericType(normalizedArguments);
         }
 
-        public static bool TryBindSerializerType(Type objectType, Type templateType, Type serializerType, out Type constructedType)
+        private static bool TryBindSerializerType(Type objectType, Type templateType, Type serializerType, out Type constructedType)
         {
+            Debug.Assert(!objectType.IsGenericType || objectType.IsConstructedGenericType);
+            Debug.Assert(serializerType.IsTypeDefinition);
             constructedType = serializerType;
 
             // Serializer needs no type arguments bound, so it can be instantiated directly
             if (!serializerType.IsGenericType) return true;
 
-            Debug.Assert(serializerType.IsGenericTypeDefinition);
-
             // If building type map fails (because a type in template type mapped to multiple
             // different types in the object type), we'll just return null
             if (!TryGetGenericTypeMap(objectType, templateType, out var typeMap)) return false;
-            var serializerObjectArgs = serializerType.GetGenericArguments().Select(t => typeMap[t]).ToArray();
+
+            // If any of the types we need to construct this type could not be found in the
+            // object type, then we'll just return null
+            Type[] serializerArgs = serializerType.GetGenericArguments();
+            if (serializerArgs.Any(sa => !typeMap.ContainsKey(sa))) return false;
+
+            var serializerObjectArgs = serializerArgs.Select(t => typeMap[t]).ToArray();
 
             // Instantiating generic type may fail if the type has a generic type constraint
             // If this is the case, we'll just return null to indicate that a serializer cannot be
@@ -198,21 +233,33 @@ namespace Shards.Tags.Serialization
         //      objectType = Dictionary<string, bool>
         //      templateType = Dictionary<K, V>
         //      K -> string, V -> bool
-        public static bool TryGetGenericTypeMap(Type objectType, Type templateType, out IDictionary<Type, Type> typeMap)
+        private static bool TryGetGenericTypeMap(Type objectType, Type templateType, out IDictionary<Type, Type> typeMap)
         {
             // Recursively builds the generic type map.
             bool ConstructGenericTypeMap(Type objectType, Type templateType, IDictionary<Type, Type> typeMap)
             {
+                Debug.Assert(!objectType.IsGenericType || objectType.IsConstructedGenericType);
+
                 if (templateType.IsGenericTypeParameter)
                 {
+                    // Add constraints
+                    foreach (var constraint in templateType.GetGenericParameterConstraints())
+                    {
+                        Type baseType = GetBaseType(objectType, constraint);
+                        if (baseType is not null && !ConstructGenericTypeMap(baseType, constraint, typeMap))
+                            return false;
+                    }
+
                     if (typeMap.TryGetValue(templateType, out var existingType) && existingType != objectType) return false;
                     typeMap.Add(templateType, objectType);
                     return true;
                 }
 
+                if (!objectType.IsGenericType || !templateType.IsGenericType) return true;
+                if (objectType.GetGenericTypeDefinition() != templateType.GetGenericTypeDefinition()) return true;
+
                 Type[] objectArguments = objectType.GetGenericArguments();
                 Type[] templateArguments = templateType.GetGenericArguments();
-                Debug.Assert(objectArguments.Length == templateArguments.Length);
 
                 for (int i = 0; i < objectArguments.Length; i++)
                 {
@@ -227,23 +274,25 @@ namespace Shards.Tags.Serialization
             return ConstructGenericTypeMap(objectType, templateType, typeMap);
         }
 
-        //                 Dict<int, HS<string>>
-        //                       |       |
-        //                  {int, K}  {HS<string>, HS<U>, V}
-        //
-        //  Dict<int, HS<string>>
-        // 
-        //  Dict<int, HS<U>>
-        //  Dict<U, HS<string>>
-        //
-        //  Dict<K, HS<U>>
-        //
-        //  Dict<K, V>
-
-        public static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type)
+        private static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type)
         {
-            if (!type.IsGenericType) return new[] { (0, type) };
-            return GetTypeExpansions(type, type.GetGenericArguments(), type.GetGenericTypeDefinition().GetGenericArguments(), 0, 0);
+            if (!type.IsGenericType)
+            {
+                yield return (0, type);
+                yield return (1, OpenType);
+                yield break;
+            }
+
+            var expansions = GetTypeExpansions(type, type.GetGenericArguments(), type.GetGenericTypeDefinition().GetGenericArguments(), 0, 0);
+            int maxComplexity = 0;
+
+            foreach (var expansion in expansions)
+            {
+                maxComplexity = Mathf.Max(maxComplexity, expansion.Complexity);
+                yield return expansion;
+            }
+
+            yield return (maxComplexity + 1, OpenType);
         }
 
         private static IEnumerable<(int Complexity, Type Expansion)> GetTypeExpansions(Type type, Type[] arguments, Type[] openArguments, int index, int complexity)

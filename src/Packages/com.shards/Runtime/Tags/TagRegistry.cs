@@ -9,6 +9,7 @@ namespace Shards.Tags
     public enum TagType : byte
     {
         None,
+        Null,
         Compound,
         List,
         String,
@@ -21,13 +22,13 @@ namespace Shards.Tags
         Bool
     }
 
-    public static class TagRegistry
+    internal static class TagRegistry
     {
         private static readonly Dictionary<Type, TagType> TagTypeMap = new();
 
         public static ITag CreateTagFromType(TagType type) => type switch
         {
-            TagType.None => null,
+            TagType.Null => new NullTag(),
             TagType.Compound => new CompoundTag(),
             TagType.List => new ListTag(),
             TagType.String => new StringTag(),
@@ -50,11 +51,13 @@ namespace Shards.Tags
             return tagType;
         }
 
+        public static TagType GetTypeOfTag<T>() where T : ITag => GetTypeOfTagType(typeof(T));
+
         public static TagType GetTypeOfTag(ITag tag) => GetTypeOfTagType(tag.GetType());
     }
 
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-    public class TagAttribute : Attribute
+    internal class TagAttribute : Attribute
     {
         public TagType Type { get; private set; }
         public TagAttribute(TagType type) => Type = type;
