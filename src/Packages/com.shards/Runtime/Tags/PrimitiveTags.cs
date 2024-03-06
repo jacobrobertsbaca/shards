@@ -30,12 +30,30 @@ namespace Shards.Tags
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
 
+    [Tag(TagType.SByte)]
+    public struct SByteTag : IValueTag<sbyte>
+    {
+        public sbyte Value { get; set; }
+        public SByteTag(sbyte value) => Value = value;
+        public void Read(BinaryReader reader) => Value = reader.ReadSByte();
+        public void Write(BinaryWriter writer) => writer.Write(Value);
+    }
+
     [Tag(TagType.Int16)]
     public struct Int16Tag : IValueTag<short>
     {
         public short Value { get; set; }
         public Int16Tag(short value) => Value = value;
         public void Read(BinaryReader reader) => Value = reader.ReadInt16();
+        public void Write(BinaryWriter writer) => writer.Write(Value);
+    }
+
+    [Tag(TagType.UInt16)]
+    public struct UInt16Tag : IValueTag<ushort>
+    {
+        public ushort Value { get; set; }
+        public UInt16Tag(ushort value) => Value = value;
+        public void Read(BinaryReader reader) => Value = reader.ReadUInt16();
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
 
@@ -48,6 +66,15 @@ namespace Shards.Tags
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
 
+    [Tag(TagType.UInt32)]
+    public struct UInt32Tag : IValueTag<uint>
+    {
+        public uint Value { get; set; }
+        public UInt32Tag(uint value) => Value = value;
+        public void Read(BinaryReader reader) => Value = reader.ReadUInt32();
+        public void Write(BinaryWriter writer) => writer.Write(Value);
+    }
+
     [Tag(TagType.Int64)]
     public struct Int64Tag : IValueTag<long>
     {
@@ -57,12 +84,30 @@ namespace Shards.Tags
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
 
+    [Tag(TagType.UInt64)]
+    public struct UInt64Tag : IValueTag<ulong>
+    {
+        public ulong Value { get; set; }
+        public UInt64Tag(ulong value) => Value = value;
+        public void Read(BinaryReader reader) => Value = reader.ReadUInt64();
+        public void Write(BinaryWriter writer) => writer.Write(Value);
+    }
+
     [Tag(TagType.Float)]
     public struct FloatTag : IValueTag<float>
     {
         public float Value { get; set; }
         public FloatTag(float value) => Value = value;
         public void Read(BinaryReader reader) => Value = reader.ReadSingle();
+        public void Write(BinaryWriter writer) => writer.Write(Value);
+    }
+
+    [Tag(TagType.Decimal)]
+    public struct DecimalTag : IValueTag<decimal>
+    {
+        public decimal Value { get; set; }
+        public DecimalTag(decimal value) => Value = value;
+        public void Read(BinaryReader reader) => Value = reader.ReadDecimal();
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
 

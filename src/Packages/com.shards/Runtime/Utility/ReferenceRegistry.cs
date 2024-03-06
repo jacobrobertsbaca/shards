@@ -68,6 +68,7 @@ namespace Shards.Utility
             Debug.Assert(shard);
             Reference reference;
 
+
             if (!TryGetReference(shard, out reference))
             {
                 string guid = Guid.NewGuid().ToString();
