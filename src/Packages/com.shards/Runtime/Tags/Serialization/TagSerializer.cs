@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace Shards.Tags.Serialization
 {
+    [RequireImplementors]
     internal interface ITagSerializer {}
 
     public abstract class TagSerializer<T> : ITagSerializer

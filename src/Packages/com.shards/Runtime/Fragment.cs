@@ -22,14 +22,12 @@ namespace Shards
 
         public void OnShardAdded(Shard shard)
         {
-            references.TrackShard(shard);
-            MarkSceneDirty();
+            if (references.TrackShard(shard)) MarkSceneDirty();
         }
 
         public void OnShardRemoved(Shard shard)
         {
-            references.UntrackShard(shard);
-            MarkSceneDirty();
+            if (references.UntrackShard(shard)) MarkSceneDirty();
         }
 
         public void OnAfterDeserialize() => references.References = serializedRefs;

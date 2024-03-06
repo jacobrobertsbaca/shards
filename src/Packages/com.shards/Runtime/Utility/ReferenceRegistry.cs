@@ -58,7 +58,12 @@ namespace Shards.Utility
 
         private Dictionary<string, Reference> refs = new();
 
-        public void TrackShard(Shard shard)
+        /// <summary>
+        /// Adds this shard as an active reference.
+        /// </summary>
+        /// <param name="shard">The shard to track.</param>
+        /// <returns><c>true</c> if any state has changed.</returns>
+        public bool TrackShard(Shard shard)
         {
             Debug.Assert(shard);
             Reference reference;
@@ -68,19 +73,32 @@ namespace Shards.Utility
                 string guid = Guid.NewGuid().ToString();
                 reference = new Reference(guid, shard);
                 refs.Add(guid, reference);
+                reference.Present = true;
+                return true;
             }
 
+            bool wasPresent = reference.Present;
             reference.Present = true;
+            return !wasPresent;
         }
 
-        public void UntrackShard(Shard shard)
+        /// <summary>
+        /// Removes this shard as an active reference.
+        /// </summary>
+        /// <param name="shard">The shard to stop tracking.</param>
+        /// <returns><c>true</c> if any state has changed.</returns>
+        public bool UntrackShard(Shard shard)
         {
             Debug.Assert(shard);
 
             if (TryGetReference(shard, out var reference))
             {
+                bool wasPresent = reference.Present;
                 reference.Present = false;
+                return wasPresent;
             }
+
+            return false;
         }
 
         private bool TryGetReference(Shard shard, out Reference reference)
