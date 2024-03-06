@@ -6,6 +6,10 @@ namespace Shards.Tags
     [Tag(TagType.List)]
     public sealed class ListTag : List<ITag>, ITag
     {
+        public ListTag() : base() {}
+        public ListTag(params ITag[] contents) : base(contents) {}
+        public ListTag(IEnumerable<ITag> contents) : base(contents) {}
+
         public void Read(BinaryReader reader)
         {
             Clear();
@@ -18,7 +22,7 @@ namespace Shards.Tags
                 value.Read(reader);
                 Add(value);
             }
-         }
+        }
 
         public void Write(BinaryWriter writer)
         {

@@ -1,11 +1,11 @@
 ﻿using System;
 
-namespace Shards.Tags.Serialization
+namespace Shards.Tags.Serialization.Serializers
 {
-    [TagSerializer(Priority = int.MaxValue)]
+    [TagSerializer(Fallback = true)]
     internal class ValueSerializer<TTag, TValue> : TagSerializer<TValue> where TTag : IValueTag<TValue>, new()
     {
-        public override TValue Deserialize(ITag tag) => TagSerializer.ExpectTag<TTag>(tag).Value;
+        public override void Deserialize(ref TValue value, ITag tag) => value = TagSerializer.ExpectTag<TTag>(tag).Value;
 
         public override ITag Serialize(TValue value)
         {

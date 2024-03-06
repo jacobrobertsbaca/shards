@@ -83,4 +83,22 @@ namespace Shards.Tags
         public void Read(BinaryReader reader) => Value = reader.ReadBoolean();
         public void Write(BinaryWriter writer) => writer.Write(Value);
     }
+
+    [Tag(TagType.Blob)]
+    public struct BlobTag : IValueTag<byte[]>
+    {
+        public byte[] Value { get; set; }
+        public BlobTag(byte[] value) => Value = value;
+        public void Read(BinaryReader reader)
+        {
+            int length = reader.ReadInt32();
+            Value = reader.ReadBytes(length);
+        }
+
+        public void Write(BinaryWriter writer)
+        {
+            writer.Write(Value.Length);
+            writer.Write(Value);
+        }
+    }
 }

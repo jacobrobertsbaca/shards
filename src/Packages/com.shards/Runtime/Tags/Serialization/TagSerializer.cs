@@ -4,19 +4,12 @@ using UnityEngine;
 
 namespace Shards.Tags.Serialization
 {
-    internal interface ITagSerializer
-    {
-        object Deserialize(ITag tag);
-        ITag Serialize(object value);
-    }
+    internal interface ITagSerializer {}
 
     public abstract class TagSerializer<T> : ITagSerializer
     {
-        public abstract T Deserialize(ITag tag);
+        public abstract void Deserialize(ref T value, ITag tag);
         public abstract ITag Serialize(T value);
-
-        object ITagSerializer.Deserialize(ITag tag) => Deserialize(tag);
-        ITag ITagSerializer.Serialize(object value) => Serialize((T) value);
     }
 
     public static class TagSerializer
@@ -25,16 +18,28 @@ namespace Shards.Tags.Serialization
 
         public static T Deserialize<T>(ITag tag)
         {
-            if (tag is NullTag) return default;
-            ITagSerializer serializer = registry.Get<T>();
+            T value = default;
+            Deserialize<T>(ref value, tag);
+            return value;
+        }
+
+        public static void Deserialize<T>(ref T value, ITag tag)
+        {
+            if (tag is NullTag)
+            {
+                value = default;
+                return;
+            }
+
+            TagSerializer<T> serializer = registry.Get<T>();
             if (serializer is null) ThrowNoSerializer<T>();
-            return (T) serializer.Deserialize(tag);
+            serializer.Deserialize(ref value, tag);
         }
 
         public static ITag Serialize<T>(T value)
         {
             if (value == null) return new NullTag();
-            ITagSerializer serializer = registry.Get<T>();
+            TagSerializer<T> serializer = registry.Get<T>();
             if (serializer is null) ThrowNoSerializer<T>();
             return serializer.Serialize(value);
         }
@@ -44,6 +49,14 @@ namespace Shards.Tags.Serialization
             if (tag is TTag t) return t;
             throw new TagException($"Expected {TagRegistry.GetTypeOfTag<TTag>()}, got {tag.Type}");
         }
+
+        public static ListTag ExpectList(ITag tag, int count = -1)
+        {
+            var lt = ExpectTag<ListTag>(tag);
+            if (count > 0 && lt.Count != count)
+                throw new TagException($"Expected {nameof(ListTag)} with {count} elements, got {lt.Count}");
+            return lt;
+        } 
 
         private static void ThrowNoSerializer<T>()
         {

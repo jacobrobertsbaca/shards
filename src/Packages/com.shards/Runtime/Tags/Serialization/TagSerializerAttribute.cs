@@ -23,5 +23,11 @@ namespace Shards.Tags.Serialization
         /// </para>
         /// </summary>
         public int Priority { get; set; } = 0;
+
+        /// <summary>
+        /// If <c>true</c>, will only be used if no other serializers are defined.
+        /// This overrides <see cref="Priority"/>, effectively setting it to the max value.
+        /// </summary>
+        public bool Fallback { get; set; } = false;
     }
 }

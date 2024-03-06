@@ -5,11 +5,74 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using Shards.Tags.Serialization;
 using Shards.Tags;
+using System;
 
 namespace Shards.Tests.Tags.Serialization
 {
     public class SerializerRegistryTests
     {
+        private static readonly Type TypeParameter = typeof(List<>).GetGenericArguments()[0];
+
+        [Test]
+        public void BaseType()
+        {
+            // derived not in inheritance hierarchy of base type
+            Assert.IsNull(SerializerRegistry.GetBaseType(typeof(int), typeof(ArrayList))); // non-generic
+            Assert.IsNull(SerializerRegistry.GetBaseType(typeof(int), typeof(List<int>))); // generic
+            Assert.IsNull(SerializerRegistry.GetBaseType(typeof(int), typeof(IList)));     // interface
+
+            // interfaces
+            Assert.AreEqual(SerializerRegistry.GetBaseType(typeof(List<int>), typeof(ICollection<>)), typeof(ICollection<int>));
+            Assert.AreEqual(SerializerRegistry.GetBaseType(typeof(int[]), typeof(ICollection<>)), typeof(ICollection<int>));
+
+            // walking up hierarchy
+            Assert.AreEqual(SerializerRegistry.GetBaseType(typeof(ListTag), typeof(List<>)), typeof(List<ITag>));
+        }
+
+        [Test]
+        public void NormalizeType()
+        {
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(typeof(float)), typeof(float));
+
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(TypeParameter), SerializerRegistry.OpenType);
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(typeof(List<>)), typeof(List<SerializerRegistry.Open>));
+
+            Type partialType = typeof(Dictionary<,>).MakeGenericType(typeof(string), TypeParameter);
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(partialType), typeof(Dictionary<string, SerializerRegistry.Open>));
+
+            Type nestedPartialType = typeof(List<>).MakeGenericType(partialType);
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(nestedPartialType), typeof(List<Dictionary<string, SerializerRegistry.Open>>));
+        }
+
+        [Test]
+        public void NormalizeArrayType()
+        {
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(typeof(float[])), typeof(float[]));
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(typeof(float[,])), typeof(float[,]));
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(typeof(float[][])), typeof(float[][]));
+
+            Type openArray = TypeParameter.MakeArrayType();
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(openArray), typeof(SerializerRegistry.Open[]));
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(TypeParameter.MakeArrayType(2)), typeof(SerializerRegistry.Open[,]));
+
+            Type nestedArray = openArray.MakeArrayType();
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(nestedArray), typeof(SerializerRegistry.Open[][]));
+        }
+
+        [Test]
+        public void NormalizeMixedType()
+        {
+            Type nestedDict = typeof(Dictionary<,>).MakeGenericType(
+                typeof(List<>).MakeGenericType(TypeParameter),
+                typeof(List<>).MakeGenericType(TypeParameter)
+            );
+
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(nestedDict), typeof(Dictionary<List<SerializerRegistry.Open>, List<SerializerRegistry.Open>>));
+
+            Type nestedListArray = typeof(List<>).MakeGenericType(TypeParameter.MakeArrayType());
+            Assert.AreEqual(SerializerRegistry.GetNormalizedType(nestedListArray), typeof(List<SerializerRegistry.Open[]>));
+        }
+
         [Test]
         public void ExpandType()
         {
@@ -79,14 +142,14 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Ignore = true)]
         private class StringKeyDictSerializer<T> : TagSerializer<Dictionary<string, T>>
         {
-            public override Dictionary<string, T> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref Dictionary<string, T> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(Dictionary<string, T> value) => throw new System.NotImplementedException();
         }
 
         [TagSerializer(Ignore = true)]
         private class IntValueDictSerializer<T> : TagSerializer<Dictionary<T, int>>
         {
-            public override Dictionary<T, int> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref Dictionary<T, int> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(Dictionary<T, int> value) => throw new System.NotImplementedException();
         }
 
@@ -102,7 +165,7 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Priority = -1, Ignore = true)]
         private class OverrideStringKeyDictSerializer<T> : TagSerializer<Dictionary<string, T>>
         {
-            public override Dictionary<string, T> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref Dictionary<string, T> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(Dictionary<string, T> value) => throw new System.NotImplementedException();
         }
 
@@ -116,7 +179,7 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Ignore = true)]
         private class FloatSerializer : TagSerializer<float>
         {
-            public override float Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref float value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(float value) => throw new System.NotImplementedException();
         }
 
@@ -130,7 +193,7 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Ignore = true)]
         private class ListSerializer<T> : TagSerializer<List<T>>
         {
-            public override List<T> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref List<T> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(List<T> value) => throw new System.NotImplementedException();
         }
 
@@ -146,14 +209,14 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Ignore = true)]
         private class DictionarySerializer<K, V> : TagSerializer<Dictionary<K, V>>
         {
-            public override Dictionary<K, V> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref Dictionary<K, V> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(Dictionary<K, V> value) => throw new System.NotImplementedException();
         }
 
         [TagSerializer(Ignore = true)]
         private class ReversedDictionarySerializer<K, V> : TagSerializer<Dictionary<V, K>>
         {
-            public override Dictionary<V, K> Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref Dictionary<V, K> value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(Dictionary<V, K> value) => throw new System.NotImplementedException();
         }
 
@@ -183,14 +246,14 @@ namespace Shards.Tests.Tags.Serialization
         [TagSerializer(Ignore = true, Priority = int.MaxValue)]
         private class LowPriority : TagSerializer<float>
         {
-            public override float Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref float value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(float value) => throw new System.NotImplementedException();
         }
 
         [TagSerializer(Ignore = true, Priority = 0)]
         private class HighPriority : TagSerializer<float>
         {
-            public override float Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref float value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(float value) => throw new System.NotImplementedException();
         }
 
@@ -205,7 +268,7 @@ namespace Shards.Tests.Tags.Serialization
         private class CollectionSerializer<TElement, TCollection>
         : TagSerializer<TCollection> where TCollection : ICollection<TElement>, new()
         {
-            public override TCollection Deserialize(ITag tag) => throw new System.NotImplementedException();
+            public override void Deserialize(ref TCollection value, ITag tag) => throw new System.NotImplementedException();
             public override ITag Serialize(TCollection value) => throw new System.NotImplementedException();
         }
 

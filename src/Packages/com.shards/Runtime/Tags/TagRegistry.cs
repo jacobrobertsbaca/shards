@@ -19,7 +19,8 @@ namespace Shards.Tags
         Int64,
         Float,
         Double,
-        Bool
+        Bool,
+        Blob
     }
 
     internal static class TagRegistry
@@ -39,6 +40,7 @@ namespace Shards.Tags
             TagType.Float => new FloatTag(),
             TagType.Double => new DoubleTag(),
             TagType.Bool => new BoolTag(),
+            TagType.Blob => new BlobTag(),
             _ => throw new ArgumentException($"No such tag type: {type}")
         };
 

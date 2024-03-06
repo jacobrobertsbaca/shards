@@ -68,12 +68,12 @@ namespace Shards.Tags.Serialization
             }
         }
 
-        public ITagSerializer Get<T>()
+        public TagSerializer<T> Get<T>()
         {
             var objectType = typeof(T);
-            if (serializers.TryGetValue(objectType, out var serializer)) return serializer;
+            if (serializers.TryGetValue(objectType, out var serializer)) return (TagSerializer<T>) serializer;
             serializers[objectType] = ResolveSerializer(objectType);
-            return serializers[objectType];
+            return (TagSerializer<T>) serializers[objectType];
         }
 
         private ITagSerializer ResolveSerializer(Type objectType)
@@ -142,12 +142,14 @@ namespace Shards.Tags.Serialization
         {
             var attr = serializerType.GetCustomAttribute<TagSerializerAttribute>();
             if (attr is null) return 0;
+            if (attr.Fallback) return int.MaxValue;
             return attr.Priority;
         }
 
-        private static Type GetBaseType(Type derivedType, Type baseType)
+        internal static Type GetBaseType(Type derivedType, Type baseType)
         {
             Debug.Assert(derivedType is not null);
+            Debug.Assert(baseType is not null);
             if (derivedType == baseType) return derivedType;
             if (!baseType.IsGenericType) return baseType.IsAssignableFrom(derivedType) ? baseType : null;
             if (baseType.IsInterface) return derivedType.GetInterfaces()
@@ -173,9 +175,16 @@ namespace Shards.Tags.Serialization
         /// <returns>The serializer's desired type.</returns>
         private static Type GetSerializedType(Type serializerType) => GetBaseType(serializerType, typeof(TagSerializer<>)).GetGenericArguments()[0];
 
-        private static Type GetNormalizedType(Type type)
+        internal static Type GetNormalizedType(Type type)
         {
-            if (type.IsGenericParameter) return OpenType; 
+            if (type.IsGenericParameter) return OpenType;
+
+            if (type.IsArray)
+            {
+                if (type.IsSZArray) return GetNormalizedType(type.GetElementType()).MakeArrayType();
+                return GetNormalizedType(type.GetElementType()).MakeArrayType(type.GetArrayRank());
+            }
+
             if (!type.IsGenericType) return type;
 
             return type.GetGenericTypeDefinition().MakeGenericType(
@@ -225,15 +234,14 @@ namespace Shards.Tags.Serialization
             // Recursively builds the generic type map.
             bool ConstructGenericTypeMap(Type objectType, Type templateType, IDictionary<Type, Type> typeMap)
             {
-                Debug.Assert(!objectType.IsGenericType || objectType.IsConstructedGenericType);
-
                 if (templateType.IsGenericTypeParameter)
                 {
                     // Search generic constraints
                     foreach (var constraint in templateType.GetGenericParameterConstraints())
                     {
                         Type baseType = GetBaseType(objectType, constraint);
-                        if (baseType is not null && !ConstructGenericTypeMap(baseType, constraint, typeMap))
+                        if (baseType is null) return false;
+                        if (!ConstructGenericTypeMap(baseType, constraint, typeMap))
                             return false;
                     }
 
@@ -242,19 +250,32 @@ namespace Shards.Tags.Serialization
                     return true;
                 }
 
-                if (!objectType.IsGenericType || !templateType.IsGenericType) return true;
-                if (objectType.GetGenericTypeDefinition() != templateType.GetGenericTypeDefinition()) return true;
-
-                Type[] objectArguments = objectType.GetGenericArguments();
-                Type[] templateArguments = templateType.GetGenericArguments();
-
-                for (int i = 0; i < objectArguments.Length; i++)
+                if (templateType.IsArray)
                 {
-                    if (!ConstructGenericTypeMap(objectArguments[i], templateArguments[i], typeMap))
-                        return false;
+                    if (!objectType.IsArray) return false;
+                    if (objectType.IsSZArray != templateType.IsSZArray) return false;
+                    if (objectType.GetArrayRank() != templateType.GetArrayRank()) return false;
+                    return ConstructGenericTypeMap(objectType.GetElementType(), templateType.GetElementType(), typeMap);
                 }
 
-                return true;
+                if (templateType.IsGenericType)
+                {
+                    if (!objectType.IsGenericType) return false;
+                    if (objectType.GetGenericTypeDefinition() != templateType.GetGenericTypeDefinition()) return false;
+
+                    Type[] objectArguments = objectType.GetGenericArguments();
+                    Type[] templateArguments = templateType.GetGenericArguments();
+
+                    for (int i = 0; i < objectArguments.Length; i++)
+                    {
+                        if (!ConstructGenericTypeMap(objectArguments[i], templateArguments[i], typeMap))
+                            return false;
+                    }
+
+                    return true;
+                }
+
+                return templateType == objectType;
             }
 
             typeMap = new Dictionary<Type, Type>();
