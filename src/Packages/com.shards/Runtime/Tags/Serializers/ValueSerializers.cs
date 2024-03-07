@@ -1,6 +1,7 @@
 ﻿using System;
+using Shards.Tags.Serialization;
 
-namespace Shards.Tags.Serialization.Serializers
+namespace Shards.Tags.Serializers
 {
     [TagSerializer(Fallback = true)]
     internal abstract class ValueSerializer<TTag, TValue> : TagSerializer<TValue>

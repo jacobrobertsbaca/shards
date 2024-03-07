@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using Shards.Tags.Serialization;
 
-namespace Shards.Tags.Serialization.Serializers
+namespace Shards.Tags.Serializers
 {
     [TagSerializer(Fallback = true)]
     internal class KeyValuePairSerializer<TKey, TValue> : TagSerializer<KeyValuePair<TKey, TValue>>

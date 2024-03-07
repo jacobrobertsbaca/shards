@@ -1,6 +1,7 @@
-﻿using UnityEngine;
+﻿using Shards.Tags.Serialization;
+using UnityEngine;
 
-namespace Shards.Tags.Serialization.Serializers
+namespace Shards.Tags.Serializers
 {
     [TagSerializer(Fallback = true)]
     internal class Vector2Serializer : TagSerializer<Vector2>

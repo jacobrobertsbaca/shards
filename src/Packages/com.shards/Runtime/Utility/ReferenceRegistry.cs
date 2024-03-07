@@ -37,37 +37,17 @@ namespace Shards.Utility
             }
         }
 
-        public Reference[] References
-        {
-            get
-            {
-                var refArray = refs.Values.Where(r => r.IsValid()).ToArray();
-                Array.Sort(refArray, (a, b) => -a.Present.CompareTo(b.Present));
-                return refArray;
-            }
-
-            set
-            {
-                refs.Clear();
-                foreach (var sr in value)
-                {
-                    if (sr.IsValid()) refs.Add(sr.Id, sr);
-                }
-            }
-        }
-
         private Dictionary<string, Reference> refs = new();
 
         /// <summary>
         /// Adds this shard as an active reference.
         /// </summary>
         /// <param name="shard">The shard to track.</param>
-        /// <returns><c>true</c> if any state has changed.</returns>
+        /// <returns><c>true</c> if a new reference was tracked.</returns>
         public bool TrackShard(Shard shard)
         {
             Debug.Assert(shard);
             Reference reference;
-
 
             if (!TryGetReference(shard, out reference))
             {
@@ -78,28 +58,39 @@ namespace Shards.Utility
                 return true;
             }
 
-            bool wasPresent = reference.Present;
             reference.Present = true;
-            return !wasPresent;
+            return false;
         }
 
         /// <summary>
         /// Removes this shard as an active reference.
         /// </summary>
         /// <param name="shard">The shard to stop tracking.</param>
-        /// <returns><c>true</c> if any state has changed.</returns>
-        public bool UntrackShard(Shard shard)
+        public void UntrackShard(Shard shard)
         {
             Debug.Assert(shard);
 
             if (TryGetReference(shard, out var reference))
             {
-                bool wasPresent = reference.Present;
                 reference.Present = false;
-                return wasPresent;
             }
+        }
 
-            return false;
+        public Reference[] GetReferences()
+        {
+            var refArray = refs.Values.Where(r => r.IsValid()).ToArray();
+            Array.Sort(refArray, (a, b) => -a.Present.CompareTo(b.Present));
+            return refArray;
+        }
+
+        public void SetReferences(Reference[] references)
+        {
+            refs.Clear();
+            if (references is null) return;
+            foreach (var sr in references)
+            {
+                if (sr.IsValid()) refs.Add(sr.Id, sr);
+            }
         }
 
         private bool TryGetReference(Shard shard, out Reference reference)

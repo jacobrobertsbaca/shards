@@ -6,7 +6,7 @@ using UnityEngine.TestTools;
 using Shards.Tags.Serialization;
 using Shards.Tags;
 
-namespace Shards.Tests.Tags.Serialization.Serializers
+namespace Shards.Tests.Tags.Serializers
 {
     public class CollectionSerializersTests
     {

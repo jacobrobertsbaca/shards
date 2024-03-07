@@ -1,7 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Shards.Tags.Serialization;
 
-namespace Shards.Tags.Serialization.Serializers
+namespace Shards.Tags.Serializers
 {
     [TagSerializer(Fallback = true)]
     internal class ArraySerializer<TElement> : TagSerializer<TElement[]>

@@ -20,25 +20,32 @@ namespace Shards
 
         private bool fragmentCached = false;
         private Fragment fragment;
-        private Fragment lastFragment;
 
         private void OnEnable()
         {
             if (Fragment) Fragment.OnShardAdded(this);
-            lastFragment = Fragment;
+        }
+
+        private void OnBeforeTransformParentChanged()
+        {
+            if (isActiveAndEnabled && Fragment) Fragment.OnShardRemoved(this);
         }
 
         private void OnTransformParentChanged()
         {
-            if (isActiveAndEnabled && lastFragment) lastFragment.OnShardRemoved(this);
             fragmentCached = false;
             if (isActiveAndEnabled && Fragment) Fragment.OnShardAdded(this);
-            lastFragment = Fragment;
         }
 
         private void OnDisable()
         {
             if (Fragment) Fragment.OnShardRemoved(this);
+        }
+
+        internal void NotifyFragmentMayChange()
+        {
+            OnBeforeTransformParentChanged();
+            OnTransformParentChanged();
         }
     }
 }
